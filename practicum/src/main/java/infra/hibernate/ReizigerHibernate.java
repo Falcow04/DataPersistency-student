@@ -3,8 +3,6 @@ package infra.hibernate;
 import domain.IReizigerDao;
 import domain.Reiziger;
 import jakarta.persistence.EntityManager;
-import jakarta.transaction.Transactional;
-import jakarta.persistence.TypedQuery;
 
 import java.sql.Date;
 import java.sql.SQLException;
@@ -24,7 +22,7 @@ public class ReizigerHibernate implements IReizigerDao {
             entityManager.persist(reiziger);
         } catch (Exception e) {
             entityManager.getTransaction().rollback();
-            throw new SQLException("Error while saving Reiziger: " + e.getMessage(), e);
+            throw new SQLException("Error saving Reiziger", e);
         }
     }
 
@@ -33,19 +31,18 @@ public class ReizigerHibernate implements IReizigerDao {
         try {
             entityManager.merge(reiziger);
         } catch (Exception e) {
-            throw new SQLException("Failed to update Reiziger", e);
+            entityManager.getTransaction().rollback();
+            throw new SQLException("Error updating Reiziger", e);
         }
     }
 
     @Override
     public void delete(Reiziger reiziger) throws SQLException {
         try {
-            Reiziger managedReiziger = entityManager.find(Reiziger.class, reiziger.getReizigerId());
-            if (managedReiziger != null) {
-                entityManager.remove(managedReiziger);
-            }
+            entityManager.remove(reiziger);
         } catch (Exception e) {
-            throw new SQLException("Failed to delete Reiziger", e);
+            entityManager.getTransaction().rollback();
+            throw new SQLException("Error deleting Reiziger", e);
         }
     }
 
@@ -56,16 +53,13 @@ public class ReizigerHibernate implements IReizigerDao {
 
     @Override
     public List<Reiziger> findByGeboorteDatum(Date date) {
-        TypedQuery<Reiziger> query = entityManager.createQuery(
-                "SELECT r FROM Reiziger r WHERE r.geboortedatum = :geboortedatum", Reiziger.class);
-        query.setParameter("geboortedatum", date);
-        return query.getResultList();
+        return entityManager.createQuery("SELECT r FROM Reiziger r WHERE r.geboortedatum = :date", Reiziger.class)
+                .setParameter("date", date)
+                .getResultList();
     }
 
     @Override
     public List<Reiziger> findAll() throws SQLException {
-        TypedQuery<Reiziger> query = entityManager.createQuery(
-                "SELECT r FROM Reiziger r", Reiziger.class);
-        return query.getResultList();
+        return entityManager.createQuery("SELECT r FROM Reiziger r", Reiziger.class).getResultList();
     }
 }
