@@ -10,55 +10,40 @@ import java.util.List;
 
 public class ProductDaoHibernate implements IProductDao {
 
-    private EntityManager entityManager;
+    private final EntityManager entityManager;
 
-    // Constructor om de EntityManager in te stellen
     public ProductDaoHibernate(EntityManager entityManager) {
         this.entityManager = entityManager;
     }
 
     @Override
     public void save(Product product) throws SQLException {
-        // Implementatie voor opslaan van product
         try {
-            entityManager.getTransaction().begin();
             entityManager.persist(product);
-            entityManager.getTransaction().commit();
         } catch (Exception e) {
-            if (entityManager.getTransaction().isActive()) {
-                entityManager.getTransaction().rollback();
-            }
-            throw new SQLException("Error saving product", e);
+            entityManager.getTransaction().rollback();
+            throw new SQLException("Error saving Product", e);
         }
     }
 
     @Override
     public void update(Product product) throws SQLException {
-        // Implementatie voor bijwerken van product
         try {
-            entityManager.getTransaction().begin();
             entityManager.merge(product);
-            entityManager.getTransaction().commit();
         } catch (Exception e) {
-            if (entityManager.getTransaction().isActive()) {
-                entityManager.getTransaction().rollback();
-            }
-            throw new SQLException("Error updating product", e);
+            entityManager.getTransaction().rollback();
+            throw new SQLException("Error updating Product", e);
         }
     }
 
     @Override
     public void delete(Product product) throws SQLException {
-        // Implementatie voor verwijderen van product
         try {
-            entityManager.getTransaction().begin();
-            entityManager.remove(entityManager.contains(product) ? product : entityManager.merge(product));
-            entityManager.getTransaction().commit();
+            product.getOvChipKaarten().forEach(ovChipkaart -> ovChipkaart.getProducten().remove(product));
+            entityManager.remove(product);
         } catch (Exception e) {
-            if (entityManager.getTransaction().isActive()) {
-                entityManager.getTransaction().rollback();
-            }
-            throw new SQLException("Error deleting product", e);
+            entityManager.getTransaction().rollback();
+            throw new SQLException("Error deleting Product", e);
         }
     }
 
@@ -67,27 +52,28 @@ public class ProductDaoHibernate implements IProductDao {
         try {
             return entityManager.find(Product.class, id);
         } catch (Exception e) {
-            throw new SQLException("Error finding product by ID", e);
+            throw new SQLException("Error finding Product by ID", e);
         }
     }
 
     @Override
     public List<Product> findByOvChipkaart(OvChipkaart ovChipkaart) throws SQLException {
         try {
-            return entityManager.createQuery("SELECT p FROM Product p WHERE p.ovChipkaart = :ovChipkaart", Product.class)
+            return entityManager.createQuery("SELECT p FROM Product p WHERE :ovChipkaart MEMBER OF p.ovChipKaarten", Product.class)
                     .setParameter("ovChipkaart", ovChipkaart)
                     .getResultList();
         } catch (Exception e) {
-            throw new SQLException("Error finding products by OvChipkaart", e);
+            throw new SQLException("Error finding Products by OvChipkaart", e);
         }
     }
 
     @Override
     public List<Product> findAll() throws SQLException {
         try {
-            return entityManager.createQuery("SELECT p FROM Product p", Product.class).getResultList();
+            return entityManager.createQuery("SELECT p FROM Product p", Product.class)
+                    .getResultList();
         } catch (Exception e) {
-            throw new SQLException("Error finding all products", e);
+            throw new SQLException("Error finding all Products", e);
         }
     }
 }

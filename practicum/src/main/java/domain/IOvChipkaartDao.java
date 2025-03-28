@@ -13,4 +13,6 @@ public interface IOvChipkaartDao {
     List<OvChipkaart> findByReiziger(Reiziger reiziger) throws SQLException;
 
     List<OvChipkaart> findAll() throws SQLException;
+
+    void setProductDao(IProductDao productDao);
 }
