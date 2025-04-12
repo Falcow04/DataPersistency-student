@@ -11,144 +11,156 @@ public class ReizigerDaoPsql implements IReizigerDao {
     private Connection connection;
     private IOvChipkaartDao ovChipkaartDao;
     private IAdresDao adresDao;
+    private IProductDao productDao;
 
     public ReizigerDaoPsql(Connection connection) {
         this.connection = connection;
+        this.adresDao = new AdresDaoPsql(connection);
+        this.ovChipkaartDao = new OvChipkaartDaoPsql(connection);
+        this.productDao = new ProductDaoPsql(connection);
     }
 
     @Override
     public void save(Reiziger reiziger) throws SQLException {
-        String sql = "INSERT INTO reiziger (reiziger_id, voorletters, tussenvoegsel, achternaam, geboortedatum) VALUES (?, ?, ?, ?, ?)";
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setInt(1, reiziger.getReizigerId());
-            pstmt.setString(2, reiziger.getVoorletters());
-            pstmt.setString(3, reiziger.getTussenvoegsel());
-            pstmt.setString(4, reiziger.getAchternaam());
-            pstmt.setDate(5, reiziger.getGeboortedatum());
-
-            pstmt.executeUpdate();
+        String query = "INSERT INTO reiziger (reiziger_id, voorletters, tussenvoegsel, achternaam, geboortedatum) VALUES (?, ?, ?, ?, ?)";
+        try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+            preparedStatement.setInt(1, reiziger.getReizigerId());
+            preparedStatement.setString(2, reiziger.getVoorletters());
+            preparedStatement.setString(3, reiziger.getTussenvoegsel());
+            preparedStatement.setString(4, reiziger.getAchternaam());
+            preparedStatement.setDate(5, reiziger.getGeboortedatum());
+            preparedStatement.executeUpdate();
         }
 
-        // Save address if present
-        if (reiziger.getAdres() != null && adresDao != null) {
-            adresDao.save(reiziger.getAdres());
+        Adres adres = reiziger.getAdres();
+        if (adres != null) {
+            adres.setReiziger(reiziger);
+            adresDao.save(adres);
         }
 
-        // Save OV-chipkaarten if present
-        if (reiziger.getOvChipkaart() != null && ovChipkaartDao != null) {
-            for (OvChipkaart ovChipkaart : reiziger.getOvChipkaart()) {
-                ovChipkaartDao.save(ovChipkaart);
+        for (OvChipkaart ovChipkaart : reiziger.getOvChipkaart()) {
+            ovChipkaart.setReiziger(reiziger);
+            ovChipkaartDao.save(ovChipkaart);
+
+            for (Product product : ovChipkaart.getProducten()) {
+                productDao.save(product);
+                String joinQuery = "INSERT INTO ov_chipkaart_product (kaart_nummer, product_nummer) VALUES (?, ?)";
+                try (PreparedStatement joinStatement = connection.prepareStatement(joinQuery)) {
+                    joinStatement.setInt(1, ovChipkaart.getKaartNummer());
+                    joinStatement.setInt(2, product.getProductNummer());
+                    joinStatement.executeUpdate();
+                }
             }
         }
     }
 
     @Override
     public void update(Reiziger reiziger) throws SQLException {
-        String sql = "UPDATE reiziger SET voorletters = ?, tussenvoegsel = ?, achternaam = ?, geboortedatum = ? WHERE reiziger_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setString(1, reiziger.getVoorletters());
-            pstmt.setString(2, reiziger.getTussenvoegsel());
-            pstmt.setString(3, reiziger.getAchternaam());
-            pstmt.setDate(4, reiziger.getGeboortedatum());
-            pstmt.setInt(5, reiziger.getReizigerId());
-
-            pstmt.executeUpdate();
+        String query = "UPDATE reiziger SET voorletters = ?, tussenvoegsel = ?, achternaam = ?, geboortedatum = ? WHERE reiziger_id = ?";
+        try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+            preparedStatement.setString(1, reiziger.getVoorletters());
+            preparedStatement.setString(2, reiziger.getTussenvoegsel());
+            preparedStatement.setString(3, reiziger.getAchternaam());
+            preparedStatement.setDate(4, reiziger.getGeboortedatum());
+            preparedStatement.setInt(5, reiziger.getReizigerId());
+            preparedStatement.executeUpdate();
         }
 
-        // Update address if present
-        if (reiziger.getAdres() != null && adresDao != null) {
-            adresDao.update(reiziger.getAdres());
+        Adres adres = reiziger.getAdres();
+        if (adres != null) {
+            adres.setReiziger(reiziger);
+            adresDao.update(adres);
         }
 
-        // Update OV-chipkaarten if present
-        if (reiziger.getOvChipkaart() != null && ovChipkaartDao != null) {
-            for (OvChipkaart ovChipkaart : reiziger.getOvChipkaart()) {
-                ovChipkaartDao.update(ovChipkaart);
+        for (OvChipkaart ovChipkaart : reiziger.getOvChipkaart()) {
+            ovChipkaart.setReiziger(reiziger);
+            ovChipkaartDao.update(ovChipkaart);
+
+            for (Product product : ovChipkaart.getProducten()) {
+                productDao.update(product);
             }
         }
     }
 
     @Override
     public void delete(Reiziger reiziger) throws SQLException {
-        // Delete dependent records first
-        if (adresDao != null && reiziger.getAdres() != null) {
-            adresDao.delete(reiziger.getAdres());
+        List<OvChipkaart> ovChipkaarten = ovChipkaartDao.findByReiziger(reiziger);
+        for (OvChipkaart ovChipkaart : ovChipkaarten) {
+            ovChipkaartDao.delete(ovChipkaart);
         }
 
-        if (ovChipkaartDao != null && reiziger.getOvChipkaart() != null) {
-            for (OvChipkaart ovChipkaart : reiziger.getOvChipkaart()) {
-                ovChipkaartDao.delete(ovChipkaart);
-            }
+        Adres adres = reiziger.getAdres();
+        if (adres != null) {
+            adres.setReiziger(reiziger);
+            adresDao.delete(adres);
         }
 
-        String sql = "DELETE FROM reiziger WHERE reiziger_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setInt(1, reiziger.getReizigerId());
-            pstmt.executeUpdate();
-        }
+        String query = "DELETE FROM reiziger WHERE reiziger_id = ?";
+        PreparedStatement preparedStatement = connection.prepareStatement(query);
+        preparedStatement.setInt(1, reiziger.getReizigerId());
+        preparedStatement.executeUpdate();
     }
 
     @Override
     public Reiziger findById(int id) throws SQLException {
-        String sql = "SELECT * FROM reiziger WHERE reiziger_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setInt(1, id);
-            ResultSet rs = pstmt.executeQuery();
+        String query = "SELECT * FROM reiziger WHERE reiziger_id = ?";
+        PreparedStatement preparedStatement = connection.prepareStatement(query);
+        preparedStatement.setInt(1, id);
+        ResultSet resultSet = preparedStatement.executeQuery();
+        if (resultSet.next()) {
+            Reiziger reiziger = new Reiziger();
+            reiziger.setReizigerId(resultSet.getInt("reiziger_id"));
+            reiziger.setVoorletters(resultSet.getString("voorletters"));
+            reiziger.setTussenvoegsel(resultSet.getString("tussenvoegsel"));
+            reiziger.setAchternaam(resultSet.getString("achternaam"));
+            reiziger.setGeboortedatum(resultSet.getDate("geboortedatum"));
 
-            if (rs.next()) {
-                return mapResultSetToReiziger(rs);
-            }
+            Adres adres = adresDao.findByReiziger(reiziger);
+            reiziger.setAdres(adres);
+
+            List<OvChipkaart> ovChipkaarten = ovChipkaartDao.findByReiziger(reiziger);
+            reiziger.setOvChipkaart(ovChipkaarten);
+
+            return reiziger;
         }
         return null;
     }
 
     @Override
     public List<Reiziger> findByGeboorteDatum(Date date) throws SQLException {
+        String query = "SELECT * FROM reiziger WHERE geboortedatum = ?";
+        PreparedStatement preparedStatement = connection.prepareStatement(query);
+        preparedStatement.setDate(1, date);
+        ResultSet resultSet = preparedStatement.executeQuery();
         List<Reiziger> reizigers = new ArrayList<>();
-        String sql = "SELECT * FROM reiziger WHERE geboortedatum = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setDate(1, date);
-            ResultSet rs = pstmt.executeQuery();
-
-            while (rs.next()) {
-                reizigers.add(mapResultSetToReiziger(rs));
-            }
+        while (resultSet.next()) {
+            Reiziger reiziger = new Reiziger();
+            reiziger.setReizigerId(resultSet.getInt("reiziger_id"));
+            reiziger.setVoorletters(resultSet.getString("voorletters"));
+            reiziger.setTussenvoegsel(resultSet.getString("tussenvoegsel"));
+            reiziger.setAchternaam(resultSet.getString("achternaam"));
+            reiziger.setGeboortedatum(resultSet.getDate("geboortedatum"));
+            reizigers.add(reiziger);
         }
         return reizigers;
     }
 
     @Override
     public List<Reiziger> findAll() throws SQLException {
+        String query = "SELECT * FROM reiziger";
+        PreparedStatement preparedStatement = connection.prepareStatement(query);
+        ResultSet resultSet = preparedStatement.executeQuery();
         List<Reiziger> reizigers = new ArrayList<>();
-        String sql = "SELECT * FROM reiziger";
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-
-            while (rs.next()) {
-                reizigers.add(mapResultSetToReiziger(rs));
-            }
+        while (resultSet.next()) {
+            Reiziger reiziger = new Reiziger();
+            reiziger.setReizigerId(resultSet.getInt("reiziger_id"));
+            reiziger.setVoorletters(resultSet.getString("voorletters"));
+            reiziger.setTussenvoegsel(resultSet.getString("tussenvoegsel"));
+            reiziger.setAchternaam(resultSet.getString("achternaam"));
+            reiziger.setGeboortedatum(resultSet.getDate("geboortedatum"));
+            reizigers.add(reiziger);
         }
-        return reizigers;
-    }
-
-    // Helper method to map a ResultSet row to a Reiziger object
-    private Reiziger mapResultSetToReiziger(ResultSet rs) throws SQLException {
-        Reiziger reiziger = new Reiziger();
-        reiziger.setReizigerId(rs.getInt("reiziger_id"));
-        reiziger.setVoorletters(rs.getString("voorletters"));
-        reiziger.setTussenvoegsel(rs.getString("tussenvoegsel"));
-        reiziger.setAchternaam(rs.getString("achternaam"));
-        reiziger.setGeboortedatum(rs.getDate("geboortedatum"));
-
-        // Fetch related entities if DAOs are provided
-        if (adresDao != null) {
-            reiziger.setAdres(adresDao.findByReiziger(reiziger));
-        }
-        if (ovChipkaartDao != null) {
-            reiziger.setOvChipkaart(ovChipkaartDao.findByReiziger(reiziger));
-        }
-
-        return reiziger;
+        return null;
     }
 
     public void setAdresDao(IAdresDao adresDaoPsql) {

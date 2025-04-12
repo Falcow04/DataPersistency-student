@@ -46,10 +46,10 @@
 -- DROP VIEW IF EXISTS s2_2; CREATE OR REPLACE VIEW s2_2 AS                                                     -- [TEST]
 
 -- DROP VIEW IF EXISTS s2_2;
--- CREATE OR REPLACE VIEW s2_2 AS
+CRE-- ATE OR REPLACE VIEW s2_2 AS
 -- SELECT *
 -- FROM medewerkers
--- ORDER BY functie, gbdatum ASC;
+-- ORDER BY functie, EXTRACT(YEAR FROM CURRENT_DATE) - EXTRACT(YEAR FROM gbdatum);
 
 
 -- S2.3. Door het land
@@ -100,7 +100,7 @@
 -- We breiden het salarissysteem uit naar zes schalen. Voer een extra schaal in voor mensen die
 -- tussen de 3001 en 4000 euro verdienen. Zij krijgen een toelage van 500 euro.
                                                                                        -- [TEST]
-
+-- UPDATE schalen SET bovengrens = 3000 WHERE snr = 5;
 -- INSERT INTO schalen (snr, ondergrens, bovengrens, toelage)
 -- VALUES (6, 3001, 4000, 500)
 -- ON CONFLICT DO NOTHING;
@@ -111,6 +111,19 @@
 -- Voeg deze cursus met code 'D&P' toe, maak twee uitvoeringen in Leerdam en schrijf drie
 -- mensen in.                                                                                      -- [TEST]
 
+-- INSERT INTO cursussen (code, omschrijving, type, lengte)
+-- VALUES ('D&P', 'Data & Persistency', 'ALG', 6);
+
+-- INSERT INTO uitvoeringen (cursus, begindatum, locatie, docent)
+-- VALUES 
+--     ('D&P', '2025-04-10', 'Leerdam', 7369), 
+--     ('D&P', '2025-05-15', 'Leerdam', 7566);
+
+-- INSERT INTO inschrijvingen (cursus, cursist, begindatum, evaluatie)
+-- VALUES 
+--     ('D&P', 7566, '2025-05-15', 5), 
+--     ('D&P', 7369, '2025-05-15', 4), 
+--     ('D&P', 7900, '2025-05-15', 3);
 
 -- S2.9. Salarisverhoging
 --

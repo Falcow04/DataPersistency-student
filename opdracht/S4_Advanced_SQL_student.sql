@@ -66,6 +66,7 @@
 -- S4.5. 
 -- Hoeveel uitvoeringen (`aantal`) zijn er gepland per cursus?
 -- Een voorbeeld van het mogelijke resultaat staat hieronder.
+
 -- CREATE OR REPLACE VIEW s4_5 AS
 -- SELECT cursus, COUNT(*) AS aantal
 -- FROM uitvoeringen
@@ -100,10 +101,12 @@
 -- DROP VIEW IF EXISTS s4_7; CREATE OR REPLACE VIEW s4_7 AS                                                     -- [TEST]
 -- DROP VIEW IF EXISTS s4_7;
 -- CREATE OR REPLACE VIEW s4_7 AS
--- SELECT COUNT(*) AS aantal_medewerkers,
---        AVG(comm) AS commissie_medewerkers,
---        AVG(CASE WHEN functie = 'Verkoper' THEN comm END) AS commissie_verkopers
--- FROM medewerkers;
+-- select count(mnr) as aantal_medewerkers,
+--        sum(comm) / count(mnr) as commissie_medewerkers,
+--        (select sum(comm) / count(mnr)
+--         from medewerkers
+--         where functie = 'VERKOPER') as commissie_verkopers
+-- from medewerkers;
 
 
 -- -------------------------[ HU TESTRAAMWERK ]--------------------------------
